@@ -90,21 +90,22 @@ class NeuralNetworkTrader:
         print("Model saved successfully.")
 
     @staticmethod
-    def predict_from_model(model, scaler, new_csv_file_path):
+    def predict_from_model(model_file_path, new_csv_file_path):
+        # Load the saved Keras model
+        model = tf.keras.models.load_model(model_file_path)
+
         # Initialize CryptoDataLoader with the new CSV file path
         data_loader = CryptoDataLoader(new_csv_file_path)
 
         # Load the new data from the CSV file
         x_new, y_new = data_loader.load_data()
 
-        # Preprocess the new data using the same scaler instance that was fit to the training data
-        x_new_scaled = scaler.transform(x_new)
+        # Preprocess the new data
+        scaler = StandardScaler()
+        x_new_scaled = scaler.fit_transform(x_new)
 
         # Make predictions
-        predictions_scaled = model.predict(x_new_scaled)
-
-        # Inverse transform the scaled predictions to get the actual values
-        predictions = scaler.inverse_transform(predictions_scaled.reshape(-1, 1))  # Reshape predictions_scaled
+        predictions = model.predict(x_new_scaled)
 
         print("Predictions:")
         for i, prediction in enumerate(predictions):
@@ -118,8 +119,7 @@ class NeuralNetworkTrader:
             is_correct = "True" if direction == "higher" and prediction[0] > y_new[i] else "False"
 
             print(
-                f"Prediction: {prediction[0]:.4f}, Actual: {y_new[i]:.4f}, Direction: {direction}, "
-                f"Correct: {is_correct}")
+                f"Prediction: {prediction[0]:.6f}, Actual: {y_new[i]:.6f}, Direction: {direction}, Correct: {is_correct}")
 
 
 def main():
@@ -149,7 +149,7 @@ def main():
     trader_model = f"models/{product}_neural_network_trader.keras"
     trader.save_model(trader_model)
 
-    trader.predict_from_model(trader.model, trader.scaler, crypto)
+    trader.predict_from_model(trader_model, crypto)
 
 
 if __name__ == '__main__':
