@@ -1,0 +1,21 @@
+{
+   "name": "",
+   "principal": "",
+   "principalType": "USER",
+   "publicKey": "-----BEGIN EC PUBLIC KEY-----\ \n-----END EC PUBLIC KEY-----\n",
+   "privateKey": "-----BEGIN EC PRIVATE KEY-----\ \n-----END EC PRIVATE KEY-----\n",
+   "createTime": "",
+   "projectId": "",
+   "nickname": "",
+   "scopes": [
+      "#view",
+      "#trade",
+      "#transfer",
+      "rat#view",
+      "rat#trade",
+      "rat#transfer"
+   ],
+   "allowedIps": [],
+   "keyType": "TRADING_KEY",
+   "enabled": true
+}
