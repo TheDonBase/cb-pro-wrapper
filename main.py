@@ -1,5 +1,5 @@
 import csv
-import time
+
 from datetime import datetime, timedelta
 import os
 import pandas as pd
@@ -10,7 +10,6 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
-import numpy as np
 
 
 class CryptoDataLoader:
