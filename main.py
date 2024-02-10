@@ -12,6 +12,7 @@ from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
 import numpy as np
 
+
 class CryptoDataLoader:
     def __init__(self, csv_file_path):
         self.csv_file_path = csv_file_path
@@ -27,6 +28,7 @@ class CryptoDataLoader:
         y = data['close'].values  # Target variable: 'close' price
 
         return x, y
+
 
 class CryptoTrader:
     def __init__(self, key_file):
@@ -51,25 +53,35 @@ class CryptoTrader:
 
         return csv_filename
 
+
 class NeuralNetworkTrader:
     def __init__(self, input_shape):
+        self.input_shape = input_shape
+        self.scaler = StandardScaler()  # Initialize scaler
         self.model = Sequential([
             Dense(64, activation='relu', input_shape=(input_shape,)),
             Dense(32, activation='relu'),
-            Dense(1, activation='sigmoid')  # Output layer for binary classification
+            Dense(1, activation='linear')  # Change activation to 'linear' for regression
         ])
-        self.model.compile(optimizer=Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=['accuracy'])
+        self.model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error', metrics=['mae'])
 
     def train_model(self, x_train, y_train, epochs=1000, batch_size=32):
         print("Training the neural network model...")
-        history = self.model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.2,
+        # Fit the scaler to the training data
+        self.scaler.fit(x_train)
+        # Scale the training data
+        x_train_scaled = self.scaler.transform(x_train)
+        # Train the model
+        history = self.model.fit(x_train_scaled, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.2,
                                  verbose=1)
         print("Training completed.")
 
     def evaluate_model(self, x_test, y_test):
         print("Evaluating the neural network model...")
-        loss, accuracy = self.model.evaluate(x_test, y_test)
-        print(f'Loss: {loss:.6f}, Accuracy: {accuracy:.6f}')
+        # Scale the test data
+        x_test_scaled = self.scaler.transform(x_test)
+        loss, mae = self.model.evaluate(x_test_scaled, y_test)
+        print(f'Loss: {loss:.6f}, Mean Absolute Error: {mae:.6f}')
         print("Evaluation completed.")
 
     def save_model(self, file_path):
@@ -77,27 +89,22 @@ class NeuralNetworkTrader:
         self.model.save(file_path)
         print("Model saved successfully.")
 
-class ModelPredictor:
-    def __init__(self):
-        pass
-
     @staticmethod
-    def predict_from_model(model_file_path, new_csv_file_path):
-        # Load the saved Keras model
-        model = tf.keras.models.load_model(model_file_path)
-
+    def predict_from_model(model, scaler, new_csv_file_path):
         # Initialize CryptoDataLoader with the new CSV file path
         data_loader = CryptoDataLoader(new_csv_file_path)
 
         # Load the new data from the CSV file
         x_new, y_new = data_loader.load_data()
 
-        # Preprocess the new data
-        scaler = StandardScaler()
-        x_new_scaled = scaler.fit_transform(x_new)
+        # Preprocess the new data using the same scaler instance that was fit to the training data
+        x_new_scaled = scaler.transform(x_new)
 
         # Make predictions
-        predictions = model.predict(x_new_scaled)
+        predictions_scaled = model.predict(x_new_scaled)
+
+        # Inverse transform the scaled predictions to get the actual values
+        predictions = scaler.inverse_transform(predictions_scaled.reshape(-1, 1))  # Reshape predictions_scaled
 
         print("Predictions:")
         for i, prediction in enumerate(predictions):
@@ -111,10 +118,9 @@ class ModelPredictor:
             is_correct = "True" if direction == "higher" and prediction[0] > y_new[i] else "False"
 
             print(
-                f"Prediction: {prediction[0]:.4f}, Actual: {y_new[i]:.4f}, Direction: {direction}, Correct: {is_correct}")
+                f"Prediction: {prediction[0]:.4f}, Actual: {y_new[i]:.4f}, Direction: {direction}, "
+                f"Correct: {is_correct}")
 
-def test(product, model_file_path, new_csv_file_path):
-    ModelPredictor.predict_from_model(model_file_path, new_csv_file_path)
 
 def main():
     product = input('Enter product name: ')
@@ -132,23 +138,19 @@ def main():
     x, y = data_loader.load_data()
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
 
-    # Normalize the input features
-    scaler = StandardScaler()
-    x_train_scaled = scaler.fit_transform(x_train)
-    x_test_scaled = scaler.transform(x_test)
-
     # Initialize and train the neural network model
-    input_shape = x_train_scaled.shape[1]
+    input_shape = x_train.shape[1]
     trader = NeuralNetworkTrader(input_shape=input_shape)
-    trader.train_model(x_train_scaled, y_train)
+    trader.train_model(x_train, y_train)
 
     # Evaluate the model
-    trader.evaluate_model(x_test_scaled, y_test)
+    trader.evaluate_model(x_test, y_test)
 
     trader_model = f"models/{product}_neural_network_trader.keras"
     trader.save_model(trader_model)
 
-    test(product, trader_model, crypto)
+    trader.predict_from_model(trader.model, trader.scaler, crypto)
+
 
 if __name__ == '__main__':
     main()
