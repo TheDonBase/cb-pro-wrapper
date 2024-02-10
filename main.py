@@ -49,14 +49,23 @@ class NeuralNetworkTrader:
         self.model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
 
     def train_model(self, X_train_scaled, y_train):
+        print("Training the neural network model...")
         history = self.model.fit(X_train_scaled, y_train, epochs=300, batch_size=32, validation_split=0.2)
+        print("Training completed.")
 
     def evaluate_model(self, X_test_scaled, y_test):
+        print("Evaluating the neural network model...")
         mse = self.model.evaluate(X_test_scaled, y_test)
-        print(f'Mean Squared Error: {mse}')
+        rmse = np.sqrt(mse)  # Calculate root mean squared error
+        print(f'Root Mean Squared Error (RMSE): {rmse:.6f}')
+        print("RMSE represents the average deviation of the predicted values from the actual values.")
+        print("A lower RMSE indicates better performance of the model.")
+        print("Evaluation completed.")
 
     def save_model(self, file_path):
+        print(f"Saving the trained model to {file_path}...")
         self.model.save(file_path)
+        print("Model saved successfully.")
 
 
 def main():
