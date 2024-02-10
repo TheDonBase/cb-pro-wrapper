@@ -81,7 +81,7 @@ class NeuralNetworkTrader:
         # Scale the test data
         x_test_scaled = self.scaler.transform(x_test)
         loss, mae = self.model.evaluate(x_test_scaled, y_test)
-        print(f'Loss: {loss:.6f}, Mean Absolute Error: {mae:.6f}')
+        print(f'Mean Absolute Error: {mae:.6f}')
         print("Evaluation completed.")
 
     def save_model(self, file_path):
