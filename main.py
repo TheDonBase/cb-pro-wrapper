@@ -9,6 +9,8 @@ from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
+import tensorflow as tf
+import numpy as np
 
 
 class CryptoDataLoader:
@@ -17,9 +19,9 @@ class CryptoDataLoader:
 
     def load_data(self):
         data = pd.read_csv(self.csv_file_path)
-        X = data.drop(columns=['close']).values
+        x = data.drop(columns=['close']).values
         y = data['close'].values
-        return X, y
+        return x, y
 
 
 class CryptoTrader:
@@ -48,14 +50,14 @@ class NeuralNetworkTrader:
         ])
         self.model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
 
-    def train_model(self, X_train_scaled, y_train):
+    def train_model(self, x_train_scaled, y_train):
         print("Training the neural network model...")
-        history = self.model.fit(X_train_scaled, y_train, epochs=300, batch_size=32, validation_split=0.2)
+        history = self.model.fit(x_train_scaled, y_train, epochs=300, batch_size=32, validation_split=0.2)
         print("Training completed.")
 
-    def evaluate_model(self, X_test_scaled, y_test):
+    def evaluate_model(self, x_test_scaled, y_test):
         print("Evaluating the neural network model...")
-        mse = self.model.evaluate(X_test_scaled, y_test)
+        mse = self.model.evaluate(x_test_scaled, y_test)
         rmse = np.sqrt(mse)  # Calculate root mean squared error
         print(f'Root Mean Squared Error (RMSE): {rmse:.6f}')
         print("RMSE represents the average deviation of the predicted values from the actual values.")
@@ -67,6 +69,39 @@ class NeuralNetworkTrader:
         self.model.save(file_path)
         print("Model saved successfully.")
 
+
+class ModelPredictor:
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def predict_from_model(model_file_path, new_csv_file_path):
+        # Load the saved Keras model
+        model = tf.keras.models.load_model(model_file_path)
+
+        # Initialize CryptoDataLoader with the new CSV file path
+        data_loader = CryptoDataLoader(new_csv_file_path)
+
+        # Load the new data from the CSV file
+        x_new, y_new = data_loader.load_data()
+
+        # Preprocess the new data
+        scaler = StandardScaler()
+        x_new_scaled = scaler.fit_transform(x_new)
+
+        # Make predictions
+        predictions = model.predict(x_new_scaled)
+
+        print("Predictions:")
+        for i, prediction in enumerate(predictions):
+            is_correct = "True" if abs(prediction[0] - y_new[i]) < 0.01 else "False"  # Adjust the threshold as needed
+            print(f"Prediction: {prediction[0]}, Actual: {y_new[i]}, Correct: {is_correct}")
+
+def test(product, model_file_path):
+    crypto_trader = CryptoTrader(key_file="coinbase_cloud_api_key.json")
+    crypto = crypto_trader.get_candles_data(product_id=product, start=1704851160, end=1707529560,
+                                            granularity="ONE_DAY")
+    ModelPredictor.predict_from_model(model_file_path, crypto)
 
 def main():
     product = input('Enter product name: ')
@@ -95,7 +130,9 @@ def main():
 
     # Evaluate and save the model
     trader.evaluate_model(x_test_scaled, y_test)
-    trader.save_model(f'{product}_neural_network_trader.keras')
+    trader_model = f"{product}_neural_network_trader.keras"
+    trader.save_model(trader_model)
+    test(product, trader_model)
 
 
 if __name__ == '__main__':
