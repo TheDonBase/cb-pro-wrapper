@@ -1,4 +1,7 @@
 import csv
+import time
+from datetime import datetime, timedelta
+
 import pandas as pd
 from coinbase.rest import RESTClient
 from sklearn.model_selection import train_test_split
@@ -25,7 +28,15 @@ class CryptoTrader:
 
     def get_candles_data(self, product_id, start, end, granularity):
         data = self.client.get_candles(product_id=product_id, start=start, end=end, granularity=granularity)
-        return data['candles']
+        candles = data['candles']
+
+        csv_filename = f"{product_id}-{datetime.utcfromtimestamp(end).strftime('%Y-%m-%d')}-data.csv"
+        with open(csv_filename, mode='w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=candles[0].keys())
+            writer.writeheader()
+            writer.writerows(candles)
+
+        return csv_filename
 
 
 class NeuralNetworkTrader:
@@ -49,8 +60,19 @@ class NeuralNetworkTrader:
 
 
 def main():
+    product = input('Enter product name: ')
+    end_timestamp = int(datetime.now().timestamp())
+
+    # Calculate the start timestamp (300 days earlier)
+    start_timestamp = int((datetime.now() - timedelta(days=299)).timestamp())
+
+    # Call the get_candles_data method with the calculated timestamps
+    crypto_trader = CryptoTrader(key_file="coinbase_cloud_api_key.json")
+    crypto = crypto_trader.get_candles_data(product_id=product, start=start_timestamp, end=end_timestamp,
+                                            granularity="ONE_DAY")
+
     # Load and preprocess the data
-    data_loader = CryptoDataLoader('SHIB_data.csv')
+    data_loader = CryptoDataLoader(crypto)
     x, y = data_loader.load_data()
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
     scaler = StandardScaler()
@@ -64,7 +86,7 @@ def main():
 
     # Evaluate and save the model
     trader.evaluate_model(x_test_scaled, y_test)
-    trader.save_model('neural_network_trader.keras')
+    trader.save_model(f'{product}_neural_network_trader.keras')
 
 
 if __name__ == '__main__':
