@@ -1,7 +1,7 @@
 import csv
 import time
 from datetime import datetime, timedelta
-
+import os
 import pandas as pd
 from coinbase.rest import RESTClient
 from sklearn.model_selection import train_test_split
@@ -18,9 +18,15 @@ class CryptoDataLoader:
         self.csv_file_path = csv_file_path
 
     def load_data(self):
+        # Load the CSV file
         data = pd.read_csv(self.csv_file_path)
-        x = data.drop(columns=['close']).values
-        y = data['close'].values
+
+        # Extract additional features from the 'start' column if needed (e.g., day of the week, month, etc.)
+
+        # Define the input features (X) and the target variable (y)
+        x = data[['start', 'volume']].values  # Features: 'start' (date) and 'volume'
+        y = data['close'].values  # Target variable: 'close' price
+
         return x, y
 
 
@@ -32,7 +38,14 @@ class CryptoTrader:
         data = self.client.get_candles(product_id=product_id, start=start, end=end, granularity=granularity)
         candles = data['candles']
 
-        csv_filename = f"{product_id}-{datetime.utcfromtimestamp(end).strftime('%Y-%m-%d')}-data.csv"
+        # Construct the file path within the "data" directory
+        data_dir = "data"
+        csv_filename = f"{data_dir}/{datetime.utcfromtimestamp(end).strftime('%Y-%m-%d')}/{product_id}-data.csv"
+
+        # Create the directory if it doesn't exist
+        os.makedirs(os.path.dirname(csv_filename), exist_ok=True)
+
+        # Write the data to the CSV file
         with open(csv_filename, mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=candles[0].keys())
             writer.writeheader()
@@ -44,20 +57,20 @@ class CryptoTrader:
 class NeuralNetworkTrader:
     def __init__(self, input_shape):
         self.model = Sequential([
-            Dense(64, activation='relu', input_shape=(input_shape,)),  # Pass input_shape as a tuple
+            Dense(64, activation='relu', input_shape=(input_shape,)),
             Dense(32, activation='relu'),
-            Dense(1)  # Output layer (1 neuron for regression)
+            Dense(1)  # Output layer for regression
         ])
         self.model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
 
-    def train_model(self, x_train_scaled, y_train):
+    def train_model(self, x_train, y_train, epochs=1000, batch_size=32):
         print("Training the neural network model...")
-        history = self.model.fit(x_train_scaled, y_train, epochs=300, batch_size=32, validation_split=0.2)
+        history = self.model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.2, verbose=1)
         print("Training completed.")
 
-    def evaluate_model(self, x_test_scaled, y_test):
+    def evaluate_model(self, x_test, y_test):
         print("Evaluating the neural network model...")
-        mse = self.model.evaluate(x_test_scaled, y_test)
+        mse = self.model.evaluate(x_test, y_test)
         rmse = np.sqrt(mse)  # Calculate root mean squared error
         print(f'Root Mean Squared Error (RMSE): {rmse:.6f}')
         print("RMSE represents the average deviation of the predicted values from the actual values.")
@@ -92,16 +105,15 @@ class ModelPredictor:
         # Make predictions
         predictions = model.predict(x_new_scaled)
 
+        # Print predictions and compare with actual "close" values
         print("Predictions:")
         for i, prediction in enumerate(predictions):
-            is_correct = "True" if abs(prediction[0] - y_new[i]) < 0.01 else "False"  # Adjust the threshold as needed
-            print(f"Prediction: {prediction[0]}, Actual: {y_new[i]}, Correct: {is_correct}")
+            is_correct = "True" if prediction[0] > y_new[i] else "False"
+            print(f"Prediction: {prediction[0]:.4f}, Actual: {y_new[i]:.4f}, Correct: {is_correct}")
 
-def test(product, model_file_path):
-    crypto_trader = CryptoTrader(key_file="coinbase_cloud_api_key.json")
-    crypto = crypto_trader.get_candles_data(product_id=product, start=1704851160, end=1707529560,
-                                            granularity="ONE_DAY")
-    ModelPredictor.predict_from_model(model_file_path, crypto)
+
+def test(product, model_file_path, new_csv_file_path):
+    ModelPredictor.predict_from_model(model_file_path, new_csv_file_path)
 
 def main():
     product = input('Enter product name: ')
@@ -115,24 +127,32 @@ def main():
     crypto = crypto_trader.get_candles_data(product_id=product, start=start_timestamp, end=end_timestamp,
                                             granularity="ONE_DAY")
 
-    # Load and preprocess the data
     data_loader = CryptoDataLoader(crypto)
     x, y = data_loader.load_data()
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+    # Normalize the input features
     scaler = StandardScaler()
     x_train_scaled = scaler.fit_transform(x_train)
     x_test_scaled = scaler.transform(x_test)
 
     # Initialize and train the neural network model
-    input_shape = x_train_scaled.shape[1]  # Get the shape of preprocessed input data
-    trader = NeuralNetworkTrader(input_shape=input_shape)  # Pass input_shape argument
+    input_shape = x_train_scaled.shape[1]
+    trader = NeuralNetworkTrader(input_shape=input_shape)
     trader.train_model(x_train_scaled, y_train)
 
-    # Evaluate and save the model
+    # Evaluate the model
     trader.evaluate_model(x_test_scaled, y_test)
-    trader_model = f"{product}_neural_network_trader.keras"
+
+    trader_model = f"models/{product}_neural_network_trader.keras"
     trader.save_model(trader_model)
-    test(product, trader_model)
+
+    test(product, trader_model, crypto)
+
+
+if __name__ == '__main__':
+    main()
+
 
 
 if __name__ == '__main__':
