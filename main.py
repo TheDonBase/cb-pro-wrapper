@@ -105,7 +105,8 @@ class NeuralNetworkTrader:
 
         # Make predictions
         predictions = model.predict(x_new_scaled)
-
+        wrong_predictions = 0
+        correct_predictions = 0
         print("Predictions:")
         for i, prediction in enumerate(predictions):
             if prediction[0] > y_new[i]:
@@ -115,10 +116,16 @@ class NeuralNetworkTrader:
             else:
                 direction = "equal"
 
-            is_correct = "True" if direction == "higher" and prediction[0] > y_new[i] else "False"
+            is_correct = direction == "higher" and prediction[0] > y_new[i]
+            if is_correct:
+                correct_predictions += 1
+            else:
+                wrong_predictions += 1
 
             print(
                 f"Prediction: {prediction[0]:.6f}, Actual: {y_new[i]:.6f}, Direction: {direction}, Correct: {is_correct}")
+
+        print(f"Correct predictions: {correct_predictions}\nWrong predictions: {wrong_predictions}")
 
 
 def main():
