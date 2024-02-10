@@ -12,7 +12,6 @@ from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
 import numpy as np
 
-
 class CryptoDataLoader:
     def __init__(self, csv_file_path):
         self.csv_file_path = csv_file_path
@@ -28,7 +27,6 @@ class CryptoDataLoader:
         y = data['close'].values  # Target variable: 'close' price
 
         return x, y
-
 
 class CryptoTrader:
     def __init__(self, key_file):
@@ -53,35 +51,31 @@ class CryptoTrader:
 
         return csv_filename
 
-
 class NeuralNetworkTrader:
     def __init__(self, input_shape):
         self.model = Sequential([
             Dense(64, activation='relu', input_shape=(input_shape,)),
             Dense(32, activation='relu'),
-            Dense(1)  # Output layer for regression
+            Dense(1, activation='sigmoid')  # Output layer for binary classification
         ])
-        self.model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
+        self.model.compile(optimizer=Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=['accuracy'])
 
     def train_model(self, x_train, y_train, epochs=1000, batch_size=32):
         print("Training the neural network model...")
-        history = self.model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.2, verbose=1)
+        history = self.model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_split=0.2,
+                                 verbose=1)
         print("Training completed.")
 
     def evaluate_model(self, x_test, y_test):
         print("Evaluating the neural network model...")
-        mse = self.model.evaluate(x_test, y_test)
-        rmse = np.sqrt(mse)  # Calculate root mean squared error
-        print(f'Root Mean Squared Error (RMSE): {rmse:.6f}')
-        print("RMSE represents the average deviation of the predicted values from the actual values.")
-        print("A lower RMSE indicates better performance of the model.")
+        loss, accuracy = self.model.evaluate(x_test, y_test)
+        print(f'Loss: {loss:.6f}, Accuracy: {accuracy:.6f}')
         print("Evaluation completed.")
 
     def save_model(self, file_path):
         print(f"Saving the trained model to {file_path}...")
         self.model.save(file_path)
         print("Model saved successfully.")
-
 
 class ModelPredictor:
     def __init__(self):
@@ -105,12 +99,19 @@ class ModelPredictor:
         # Make predictions
         predictions = model.predict(x_new_scaled)
 
-        # Print predictions and compare with actual "close" values
         print("Predictions:")
         for i, prediction in enumerate(predictions):
-            is_correct = "True" if prediction[0] > y_new[i] else "False"
-            print(f"Prediction: {prediction[0]:.4f}, Actual: {y_new[i]:.4f}, Correct: {is_correct}")
+            if prediction[0] > y_new[i]:
+                direction = "higher"
+            elif prediction[0] < y_new[i]:
+                direction = "lower"
+            else:
+                direction = "equal"
 
+            is_correct = "True" if direction == "higher" and prediction[0] > y_new[i] else "False"
+
+            print(
+                f"Prediction: {prediction[0]:.4f}, Actual: {y_new[i]:.4f}, Direction: {direction}, Correct: {is_correct}")
 
 def test(product, model_file_path, new_csv_file_path):
     ModelPredictor.predict_from_model(model_file_path, new_csv_file_path)
@@ -148,12 +149,6 @@ def main():
     trader.save_model(trader_model)
 
     test(product, trader_model, crypto)
-
-
-if __name__ == '__main__':
-    main()
-
-
 
 if __name__ == '__main__':
     main()
